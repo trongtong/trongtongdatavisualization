@@ -1,0 +1,234 @@
+<html>
+<script src='https://d3js.org/d3.v5.min.js'></script>
+<style> circle {fill: lightblue; stroke: black;} 
+
+		<!--select { position: absolute; left: 50px; top: 650px; }-->
+		select { position: relative; left: -450px; top: -550px; }
+		
+</style>
+                
+<body onload='init()'>
+<svg width=1000 height=600> <!--style = "border:solid"-->
+</svg>
+
+<script>
+
+var margin = 50;
+
+var svg = d3.select("svg"),
+ width = svg.attr("width") - 2*margin,
+ height = svg.attr("height") - 2*margin;
+
+var tooltip = d3.select("body")
+	.append("div")
+    .style("opacity",0)
+	.style("position", "absolute")
+    .style("text-align","center")
+    .style("width", 60)
+    .style("height", 40)
+    .style("background", "green")
+    .style("border", 0)
+
+var xdomain = [10, 150];
+var ydomain = [10, 150];
+var rdomain = [0, 200]
+var xrange = [0,width];
+var yrange = [0,height];
+var rrange = [0,1000];
+
+var cylDomain = [0,16];
+var AveHighwayMPGDomain = [0,60];
+var AveCityMPGDomain = [0,100];
+var cylRange = [0,width];
+var AveHighwayMPGRange = [height,0];
+var AveCityMPGRange = [height,0];
+
+var xcyl = d3.scaleLinear().domain(cylDomain).range(cylRange);
+var yHi = d3.scaleLinear().domain(AveHighwayMPGDomain).range(AveHighwayMPGRange);
+var yBarHi = d3.scaleLinear().domain(AveHighwayMPGDomain).range(AveHighwayMPGRange);
+
+async function init() {
+
+	 const data = await d3.csv('https://flunky.github.io/cars2017.csv');
+	 gascardata = data.filter(function(d) { return d.Fuel == "Gasoline"; });
+	 nestedgascardata = d3.nest()
+		.key(function(d) { return d.Make; })
+		.entries(gascardata);
+	 
+	 
+	 //Get a list of unique entries of a column called Make
+	 var makerNameList = d3.map(gascardata, function(d){return(d.Make)}).keys();
+	 
+	 //Add new element "All"
+	 makerNameList.unshift("All") ;
+	 //Get a list of unique entries of a column called EngineCylinders
+	 var cylinderNumberList = d3.map(gascardata, function(d){return(d.EngineCylinders)}).keys();
+	 cylinderNumberList.sort(function(a,b) { return +a - +b })
+	 //Add new element "All"
+	 //cylinderNumberList.unshift("All") ;
+ 
+ 
+  // create a drop list for maker from maker data
+	 var selector = d3.select("body")
+		.append("select")
+		.attr("id", "makeselector")
+		.selectAll("option")
+		.data(makerNameList)
+		.enter().append("option")
+		.text(function(d) { return d; })
+		.attr("value", function (d, i) {return i;});
+		
+ // create a drop list for cyclinder number from cyclinder data
+	 var selector1 = d3.select("body")
+		.append("select")
+		.attr("id", "cylinderselector")
+		.selectAll("option")
+		.data(cylinderNumberList)
+		.enter().append("option")
+		.text(function(d) { return d; })
+		.attr("value", function (d, i) {return i;});
+	 
+//When user selects a maker, update index to the selected maker index, then call update() function
+
+	var index = 0;
+	var  makerSelectedData = gascardata;
+	update();
+	d3.select("#makeselector")
+		.on("change", function(d) {
+			index = this.value;
+			
+			makerSelectedData = gascardata.filter(
+			function(d){ 
+				if (makerNameList[index] == "All"){return d}
+				else {return d.Make == makerNameList[index];}
+				}
+			);
+			update();
+		})
+    
+// Update() function to display only data for the selected maker
+	function update(){
+		d3.select("svg")
+		 .html("")
+		 .append("g")
+		 .attr("transform","translate(50,50)")
+		 .selectAll("circle")
+		 .data(makerSelectedData)
+		 .enter()
+		 .append("circle")
+		 .attr("cx", function(d){return xcyl(d.EngineCylinders);})
+		 .attr("cy", function(d){return yHi(d.AverageHighwayMPG);})
+		 .attr("r",function(d){ return 5;})
+		 .on("mouseover", function(d,i){
+			tooltip.style("opacity",1)
+				   .style("left", (d3.event.pageX)+ "px")
+				   .style("top", (d3.event.pageY)+ "px")
+				   .html(d.EngineCylinders);
+		 })
+		 .on("mouseout", function(){tooltip.style("opacity",0)})
+		var yaxis = d3.axisLeft(yHi)
+		 <!--.tickValues([10,20,50,100])-->
+		 .tickFormat(d3.format("~s"))
+		  
+		d3.select("svg")
+		.append("g")
+		 .attr("transform","translate(50,50)")
+		 .call(yaxis)
+		 
+		d3.select("svg")
+		.append("text")		
+	      .attr("transform", "rotate(-90)")
+		  .attr("y",100)
+          .attr("x",100)
+          .style("text-anchor", "middle")
+          .text("Value");    
+		  
+
+		var xaxis = d3.axisBottom(xcyl)
+		 <!--.tickValues([,20,50,100])-->
+		 .tickFormat(d3.format("~s"))
+		  
+		d3.select("svg")
+		.append("g")
+		 .attr("transform","translate(50,550)")
+		 .call(xaxis)
+		 
+		d3.select("svg")
+		.append("text")		
+		  .attr("transform","translate(500,580)")
+		  .style("text-anchor", "middle")
+		  .text("Cylinder number");
+	}
+
+
+
+//When user selects a maker, update index to the selected maker index, then call update() function
+
+	var indexCyl = 0;
+	var CylSelectedData = gascardata;
+	var xMake = d3.scaleBand().domain(makerNameList).range([0,width]);
+	
+	d3.select("#cylinderselector")
+		.on("change", function(d) {
+			indexCyl = this.value;
+		    
+			CylSelectedData = gascardata.filter(
+			function(d){ 
+				return d.EngineCylinders == cylinderNumberList[indexCyl];
+				}
+			);
+			
+			//console.log(CylSelectedData.Make);
+			//makerNameList = CylSelectedData.Make;
+			//console.log(makerNameList);
+			//xMake = d3.scaleBand().domain(CylSelectedData.Make).range([0,width]);
+			MPGvsMakerUpdate();
+		})	
+	// Plot bar chart for each engine cylinder
+	
+	
+	function MPGvsMakerUpdate(){
+		d3.select('svg')
+	    .html("")
+		.append("g")
+		.attr("transform","translate(50,50)")
+		 .selectAll("rect")
+		 .data(CylSelectedData)
+		 .enter()
+	     .append('rect')
+		 .attr('x',function(d,i) {return xMake(d.Make);})
+		 .attr('y', function(d) {return yBarHi(d.AverageHighwayMPG);})
+		 .attr('width',5)
+		 .attr('height',function(d) {return height- yBarHi(d.AverageHighwayMPG);})
+		 .style('fill',"green");
+		var yaxis = d3.axisLeft(yBarHi)
+		 <!--.tickValues([10,20,50,100])-->
+		 .tickFormat(d3.format("~s"))
+		 d3.select("svg")
+		 .append("g")
+		 .attr("transform","translate(50,50)")
+		 .call(yaxis)
+		 
+		 d3.select("svg")
+		 .append("text")		
+		  .attr("transform","translate(500,600)")
+		  .style("text-anchor", "middle")
+		  .text("Maker");
+		 
+		var xaxis = d3.axisBottom(xMake)	  
+		d3.select("svg")
+		.append("g")
+		 .attr("transform","translate(50,550)")
+		 .call(xaxis)
+		 .selectAll("text")
+		   .style("text-anchor", "end")
+           .attr("dx", "-.8em")
+           .attr("dy", ".15em")
+		   .attr("transform", "rotate(-65)");
+		 
+	}
+}
+</script>
+
+</body>
+</html>
